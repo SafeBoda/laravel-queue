@@ -3,24 +3,26 @@ namespace Enqueue\LaravelQueue;
 
 use Enqueue\Consumption\ChainExtension;
 use Enqueue\Consumption\Context\MessageReceived;
+use Enqueue\Consumption\Context\MessageResult;
 use Enqueue\Consumption\Context\PostMessageReceived;
 use Enqueue\Consumption\Context\PreConsume;
 use Enqueue\Consumption\Context\Start;
 use Enqueue\Consumption\Extension\LimitConsumedMessagesExtension;
 use Enqueue\Consumption\MessageReceivedExtensionInterface;
+use Enqueue\Consumption\MessageResultExtensionInterface;
 use Enqueue\Consumption\PostMessageReceivedExtensionInterface;
 use Enqueue\Consumption\PreConsumeExtensionInterface;
 use Enqueue\Consumption\QueueConsumer;
 use Enqueue\Consumption\Result;
 use Enqueue\Consumption\StartExtensionInterface;
-use Enqueue\LaravelQueue\Queue;
 use Illuminate\Queue\WorkerOptions;
 
 class Worker extends \Illuminate\Queue\Worker implements
     StartExtensionInterface,
     PreConsumeExtensionInterface,
     MessageReceivedExtensionInterface,
-    PostMessageReceivedExtensionInterface
+    PostMessageReceivedExtensionInterface,
+    MessageResultExtensionInterface
 {
     protected $connectionName;
 
@@ -50,6 +52,7 @@ class Worker extends \Illuminate\Queue\Worker implements
 
         if (false == $this->interop) {
             parent::daemon($connectionName, $this->queueNames, $options);
+            return;
         }
 
         $context = $this->queue->getQueueInteropContext();
@@ -77,6 +80,7 @@ class Worker extends \Illuminate\Queue\Worker implements
 
         if (false == $this->interop) {
             parent::runNextJob($connectionName, $this->queueNames, $options);
+            return;
         }
 
         $context = $this->queue->getQueueInteropContext();
@@ -139,6 +143,13 @@ class Worker extends \Illuminate\Queue\Worker implements
 
         if ($this->stopped) {
             $context->interruptExecution();
+        }
+    }
+
+    public function onResult(MessageResult $context): void
+    {
+        if ($this->supportsAsyncSignals()) {
+            $this->resetTimeoutHandler();
         }
     }
 
